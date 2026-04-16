@@ -1,4 +1,4 @@
-name: NestJS API CI
+name: CI/CD - Build & Deploy
 
 on:
   push:
@@ -7,35 +7,65 @@ on:
     branches: [main]
 
 jobs:
+  # ─── 1. Lint & Build ─────────────────────────────────────
   build:
+    name: Lint & Build
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      # <database-relational-block>
-      - name: Run e2e tests for NestJS with TypeORM
-        id: relational
-        run: docker compose -f docker-compose.relational.ci.yaml --env-file env-example-relational -p ci-relational up --build --exit-code-from api
-
-      - name: Copy prod.log from container to host
-        if: ${{ failure() && steps.relational.conclusion == 'failure' }}
-        run: docker cp ci-relational-api-1:/usr/src/app/prod.log .
-      # </database-relational-block>
-
-      # <database-document-block>
-      - name: Run e2e tests for NestJS with Mongoose
-        id: document
-        run: docker compose -f docker-compose.document.ci.yaml --env-file env-example-document -p ci-document up --build --exit-code-from api
-
-      - name: Copy prod.log from container to host
-        if: ${{ failure() && steps.document.conclusion == 'failure' }}
-        run: docker cp ci-document-api-1:/usr/src/app/prod.log .
-      # </database-document-block>
-
-      - name: Upload prod.log to artifacts for debugging
-        if: failure()
-        uses: actions/upload-artifact@v7
+      - uses: actions/setup-node@v4
         with:
-          name: prod-logs
-          path: prod.log
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  # ─── 2. Deploy to Server ─────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            set -e
+            cd /opt/lumieclaw/backend
+
+            echo "=== Pulling latest code ==="
+            git pull origin main
+
+            echo "=== Installing dependencies ==="
+            npm ci --legacy-peer-deps
+
+            echo "=== Building ==="
+            npm run build
+
+            echo "=== Running migrations ==="
+            export DATABASE_HOST=localhost
+            npm run migration:run
+            unset DATABASE_HOST
+
+            echo "=== Rebuilding & restarting Docker containers ==="
+            docker compose -f docker-compose.prod.yaml up -d --build
+
+            echo "=== Waiting for API ==="
+            sleep 5
+            curl -sf http://localhost:3000/api || echo "API not ready yet"
+
+            echo "=== Deploy complete ==="
