@@ -1,6 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import { IsString, IsInt, Min } from 'class-validator';
-import { AiProxyConfig } from './config.type';
+import { AiProxyConfig } from './ai-proxy-config.type';
 import validateConfig from '../utils/validate-config';
 
 class EnvironmentVariablesValidator {
