@@ -19,8 +19,8 @@ export default registerAs<AiProxyConfig>('aiProxy', () => {
   validateConfig(process.env, EnvironmentVariablesValidator);
 
   return {
-    baseUrl: process.env.AI_PROXY_BASE_URL,
-    apiKey: process.env.AI_PROXY_API_KEY,
+    baseUrl: process.env.AI_PROXY_BASE_URL ?? 'https://api.whatai.cc/v1',
+    apiKey: process.env.AI_PROXY_API_KEY ?? '',
     timeout: parseInt(process.env.AI_PROXY_TIMEOUT ?? '60000', 10),
   };
 });
