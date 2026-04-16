@@ -2,18 +2,25 @@
 set -e
 
 # ============================================================
-# LumieClaw Backend - Linux Server Setup Script
+# LumieClaw Backend - 一键服务器部署脚本
 # 适用于全新的 Ubuntu/Debian 服务器
-# 使用方法: chmod +x setup.sh && sudo ./setup.sh
+# 使用方法:
+#   curl -fsSL https://raw.githubusercontent.com/web3acoki/LumieBack/main/scripts/setup-server.sh | sudo bash
+#   或: chmod +x setup-server.sh && sudo ./setup-server.sh
 # ============================================================
 
+REPO_URL="https://github.com/web3acoki/LumieBack.git"
+PROJECT_DIR="/opt/lumieclaw"
+BACKEND_DIR="$PROJECT_DIR/backend"
+
 echo "=========================================="
-echo "  LumieClaw Backend Server Setup"
+echo "  LumieClaw Backend - 一键部署"
 echo "=========================================="
+echo ""
 
 # ─── 1. 系统更新 & 基础工具 ─────────────────────────────────
 
-echo "[1/7] Updating system packages..."
+echo "[1/9] 更新系统并安装基础工具..."
 apt-get update && apt-get upgrade -y
 apt-get install -y \
   curl \
@@ -27,66 +34,70 @@ apt-get install -y \
 
 # ─── 2. 安装 Docker & Docker Compose ────────────────────────
 
-echo "[2/7] Installing Docker..."
+echo "[2/9] 安装 Docker..."
 if ! command -v docker &> /dev/null; then
   curl -fsSL https://get.docker.com | sh
   systemctl enable docker
   systemctl start docker
-  echo "Docker installed successfully."
+  echo "Docker $(docker --version) 安装完成"
 else
-  echo "Docker already installed, skipping."
+  echo "Docker 已安装: $(docker --version)"
 fi
 
-# Docker Compose is included with modern Docker (docker compose v2)
 docker compose version
 
-# ─── 3. 安装 Node.js 22 (用于本地构建和迁移) ────────────────
+# ─── 3. 安装 Node.js 22 ─────────────────────────────────────
 
-echo "[3/7] Installing Node.js 22 LTS..."
+echo "[3/9] 安装 Node.js 22..."
 if ! command -v node &> /dev/null; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
-  echo "Node.js $(node -v) installed."
+  echo "Node.js $(node -v) 安装完成"
 else
-  echo "Node.js $(node -v) already installed, skipping."
+  echo "Node.js $(node -v) 已安装"
 fi
 
-# ─── 4. 安装 PostgreSQL 客户端 (用于调试) ────────────────────
+# ─── 4. 安装 PostgreSQL 客户端 ───────────────────────────────
 
-echo "[4/7] Installing PostgreSQL client..."
+echo "[4/9] 安装 PostgreSQL 客户端..."
 apt-get install -y postgresql-client
 
 # ─── 5. 防火墙配置 ──────────────────────────────────────────
 
-echo "[5/7] Configuring firewall..."
+echo "[5/9] 配置防火墙..."
 ufw allow OpenSSH
 ufw allow 3000/tcp   # NestJS API
-ufw allow 80/tcp     # HTTP (for reverse proxy later)
+ufw allow 80/tcp     # HTTP
 ufw allow 443/tcp    # HTTPS
 ufw --force enable
-echo "Firewall configured: SSH, 3000, 80, 443 open."
+echo "防火墙已开放: SSH, 3000, 80, 443"
 
-# ─── 6. 创建项目目录 ────────────────────────────────────────
+# ─── 6. 拉取代码 ────────────────────────────────────────────
 
-echo "[6/7] Creating project directory..."
-PROJECT_DIR="/opt/lumieclaw"
+echo "[6/9] 拉取代码..."
 mkdir -p "$PROJECT_DIR"
-echo "Project directory: $PROJECT_DIR"
 
-# ─── 7. 生成 .env 模板 ──────────────────────────────────────
+if [ -d "$BACKEND_DIR" ]; then
+  echo "项目目录已存在，拉取最新代码..."
+  cd "$BACKEND_DIR"
+  git pull origin main
+else
+  git clone "$REPO_URL" "$BACKEND_DIR"
+  cd "$BACKEND_DIR"
+fi
 
-echo "[7/7] Generating .env template..."
-ENV_FILE="$PROJECT_DIR/.env"
+# ─── 7. 生成 .env 配置 ──────────────────────────────────────
 
-if [ ! -f "$ENV_FILE" ]; then
-  # Generate random secrets
+echo "[7/9] 生成环境配置..."
+
+if [ ! -f "$BACKEND_DIR/.env" ]; then
   JWT_SECRET=$(openssl rand -hex 32)
   REFRESH_SECRET=$(openssl rand -hex 32)
   FORGOT_SECRET=$(openssl rand -hex 32)
   CONFIRM_SECRET=$(openssl rand -hex 32)
   DB_PASSWORD=$(openssl rand -hex 16)
 
-  cat > "$ENV_FILE" << EOF
+  cat > "$BACKEND_DIR/.env" << ENVEOF
 # ============================================================
 # LumieClaw Backend - Production Environment
 # Generated on $(date)
@@ -116,15 +127,15 @@ DATABASE_REJECT_UNAUTHORIZED=false
 # File Storage
 FILE_DRIVER=local
 
-# Mail (配置你的SMTP)
-MAIL_HOST=smtp.example.com
-MAIL_PORT=587
+# Mail
+MAIL_HOST=localhost
+MAIL_PORT=1025
 MAIL_USER=
 MAIL_PASSWORD=
-MAIL_IGNORE_TLS=false
+MAIL_IGNORE_TLS=true
 MAIL_SECURE=false
-MAIL_REQUIRE_TLS=true
-MAIL_DEFAULT_EMAIL=noreply@your-domain.com
+MAIL_REQUIRE_TLS=false
+MAIL_DEFAULT_EMAIL=noreply@lumieclaw.com
 MAIL_DEFAULT_NAME=LumieClaw
 MAIL_CLIENT_PORT=1080
 
@@ -147,53 +158,82 @@ APPLE_APP_AUDIENCE=[]
 
 # AI Proxy (神马中转站)
 AI_PROXY_BASE_URL=https://api.whatai.cc/v1
-AI_PROXY_API_KEY=your-shenma-api-key
+AI_PROXY_API_KEY=your-shenma-api-key-here
 AI_PROXY_TIMEOUT=60000
-EOF
+ENVEOF
 
-  chmod 600 "$ENV_FILE"
-  echo ""
-  echo "=========================================="
-  echo "  .env file created at: $ENV_FILE"
-  echo "  DB Password: ${DB_PASSWORD}"
-  echo "  IMPORTANT: Edit this file to fill in:"
-  echo "    - FRONTEND_DOMAIN / BACKEND_DOMAIN"
-  echo "    - MAIL settings"
-  echo "    - AI_PROXY_API_KEY (神马中转站 key)"
-  echo "    - Social auth keys (optional)"
-  echo "=========================================="
+  chmod 600 "$BACKEND_DIR/.env"
+  echo ".env 已生成 (密码: ${DB_PASSWORD})"
 else
-  echo ".env already exists, skipping."
+  echo ".env 已存在，跳过生成"
+  # Source existing DB credentials for migration
+  DB_PASSWORD=$(grep DATABASE_PASSWORD "$BACKEND_DIR/.env" | cut -d= -f2)
 fi
 
+# ─── 8. Docker 构建 & 启动 ──────────────────────────────────
+
+echo "[8/9] 构建并启动 Docker 容器..."
+cd "$BACKEND_DIR"
+
+# Start PostgreSQL first
+docker compose -f docker-compose.prod.yaml up -d postgres
+echo "等待 PostgreSQL 启动..."
+sleep 8
+
+# Check PostgreSQL is ready
+until docker compose -f docker-compose.prod.yaml exec -T postgres pg_isready -U lumieclaw 2>/dev/null; do
+  echo "等待 PostgreSQL..."
+  sleep 2
+done
+echo "PostgreSQL 已就绪"
+
+# ─── 9. 安装依赖 & 迁移 & 启动 API ─────────────────────────
+
+echo "[9/9] 安装依赖、运行迁移、启动 API..."
+
+# Install dependencies for running migrations locally
+npm install --legacy-peer-deps
+
+# For migrations, DATABASE_HOST needs to be localhost since we're running from host
+export DATABASE_HOST=localhost
+npm run build
+npm run migration:run
+npm run seed:run
+unset DATABASE_HOST
+
+# Now build and start the API container
+docker compose -f docker-compose.prod.yaml up -d --build
+
+# Wait and verify
+sleep 5
+API_URL="http://localhost:3000/api"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL" 2>/dev/null || echo "000")
+
 echo ""
 echo "=========================================="
-echo "  Setup Complete!"
+if [ "$HTTP_CODE" = "200" ]; then
+  echo "  部署成功!"
+else
+  echo "  容器已启动 (API 状态: HTTP $HTTP_CODE)"
+  echo "  可能还在初始化中，请稍等片刻"
+fi
 echo "=========================================="
 echo ""
-echo "Next steps:"
+echo "  API 地址:      http://$(hostname -I | awk '{print $1}'):3000/api"
+echo "  Swagger 文档:  http://$(hostname -I | awk '{print $1}'):3000/docs"
 echo ""
-echo "  1. Clone your project:"
-echo "     cd $PROJECT_DIR"
-echo "     git clone <your-repo-url> backend"
+echo "  默认管理员账号:"
+echo "    邮箱:   admin@example.com"
+echo "    密码:   secret"
+echo "    ⚠️  请立即修改默认密码!"
 echo ""
-echo "  2. Edit the .env file:"
-echo "     nano $PROJECT_DIR/.env"
+echo "  常用命令:"
+echo "    查看日志:  cd $BACKEND_DIR && docker compose -f docker-compose.prod.yaml logs -f api"
+echo "    重启服务:  cd $BACKEND_DIR && docker compose -f docker-compose.prod.yaml restart api"
+echo "    停止服务:  cd $BACKEND_DIR && docker compose -f docker-compose.prod.yaml down"
 echo ""
-echo "  3. Copy .env to project and start:"
-echo "     cp $PROJECT_DIR/.env $PROJECT_DIR/backend/.env"
-echo "     cd $PROJECT_DIR/backend"
-echo "     docker compose up -d postgres"
-echo ""
-echo "  4. Install deps & run migrations:"
-echo "     npm install"
-echo "     npm run build"
-echo "     npm run migration:run"
-echo "     npm run seed:run"
-echo ""
-echo "  5. Start the app:"
-echo "     npm run start:prod"
-echo "     # Or with PM2:"
-echo "     npm run pm2:start"
+echo "  ⚠️  部署后请编辑 .env 填入你的神马中转站 API Key:"
+echo "    nano $BACKEND_DIR/.env"
+echo "    然后重启: docker compose -f docker-compose.prod.yaml restart api"
 echo ""
 echo "=========================================="
