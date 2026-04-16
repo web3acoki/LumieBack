@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LumieClaw AI Proxy 测试页面</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .content { padding: 30px; }
+        .section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea { min-height: 120px; font-family: inherit; resize: vertical; }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:active { transform: translateY(0); }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .response {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .response.success { border-color: #4caf50; background: #f1f8f4; }
+        .response.error { border-color: #f44336; background: #fef1f0; color: #c62828; }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .rate-limit {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 LumieClaw AI Proxy</h1>
+            <p>神马中转站 API 测试工具 | 后端中转测试</p>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <strong>📌 测试说明：</strong><br>
+                • 后端地址: <code>http://localhost:3000/api/v1/ai</code><br>
+                • 速率限制: 每分钟最多 10 次请求<br>
+                • 此页面无需登录，直接测试后端中转功能
+            </div>
+
+            <div class="rate-limit">
+                ⚠️ <strong>速率限制：</strong>每分钟最多 10 次请求，超出将返回 429 错误
+            </div>
+
+            <div class="grid">
+                <div class="section">
+                    <h2>💬 Chat Completion 测试</h2>
+                    <div class="form-group">
+                        <label>模型</label>
+                        <select id="chatModel">
+                            <option value="gpt-4o">GPT-4o</option>
+                            <option value="gpt-4o-mini">GPT-4o-mini</option>
+                            <option value="claude-opus-4-20250514">Claude 4 Opus</option>
+                            <option value="claude-sonnet-4-20250514">Claude 4 Sonnet</option>
+                            <option value="deepseek-chat">DeepSeek V3</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>消息内容</label>
+                        <textarea id="chatMessage" placeholder="输入你的问题...">你好，请用一句话介绍你自己</textarea>
+                    </div>
+                    <button onclick="testChat()">发送对话</button>
+                    <div id="chatResponse" class="response" style="display:none;"></div>
+                </div>
+
+                <div class="section">
+                    <h2>📋 获取模型列表</h2>
+                    <p style="margin-bottom: 15px; color: #666; font-size: 14px;">
+                        获取神马中转站支持的所有模型（650+ 模型）
+                    </p>
+                    <button onclick="testModels()">获取模型列表</button>
+                    <div id="modelsResponse" class="response" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api/v1/ai';
+
+        async function testChat() {
+            const model = document.getElementById('chatModel').value;
+            const message = document.getElementById('chatMessage').value;
+            const responseDiv = document.getElementById('chatResponse');
+
+            if (!message.trim()) {
+                alert('请输入消息内容');
+                return;
+            }
+
+            responseDiv.style.display = 'block';
+            responseDiv.className = 'response';
+            responseDiv.textContent = '⏳ 请求中...';
+
+            try {
+                const response = await fetch(`${API_BASE}/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{ role: 'user', content: message }],
+                        temperature: 1,
+                        stream: false
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    responseDiv.className = 'response success';
+                    responseDiv.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.textContent = `错误 ${response.status}:\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = `请求失败: ${error.message}`;
+            }
+        }
+
+        async function testModels() {
+            const responseDiv = document.getElementById('modelsResponse');
+
+            responseDiv.style.display = 'block';
+            responseDiv.className = 'response';
+            responseDiv.textContent = '⏳ 获取中...';
+
+            try {
+                const response = await fetch(`${API_BASE}/models`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    responseDiv.className = 'response success';
+                    const modelCount = data.data?.length || 0;
+                    responseDiv.textContent = `✅ 成功获取 ${modelCount} 个模型\n\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.textContent = `错误 ${response.status}:\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.textContent = `请求失败: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

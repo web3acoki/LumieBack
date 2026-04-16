@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:17.9-alpine
+    ports:
+      - ${DATABASE_PORT}:5432
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+
+  maildev:
+    image: maildev/maildev
+    ports:
+      - ${MAIL_CLIENT_PORT}:1080
+      - ${MAIL_PORT}:1025
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
+  # Uncomment to use redis
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - 6379:6379
+
+  # ========================================
+  # DEV ONLY: OpenClaw Gateway for local testing
+  # In production, Gateway runs inside the Electron app on each user's machine.
+  # Start with: docker compose --profile dev up openclaw-gateway
+  # ========================================
+  openclaw-gateway:
+    profiles: ["dev"]
+    image: ghcr.io/openclaw/openclaw:latest
+    command: node dist/index.js gateway --bind 0.0.0.0 --port 18789
+    ports:
+      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+    environment:
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN:-dev-token}
+      - OPENCLAW_BROWSER_NO_SANDBOX=1
+      - OPENCLAW_BROWSER_DISABLE_GRAPHICS_FLAGS=1
+      - TZ=${TZ:-Asia/Shanghai}
+    volumes:
+      - ./openclaw-config:/home/node/.openclaw
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:18789/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  pg-data:

@@ -1,0 +1,60 @@
+{
+  "env": {
+    "LUMIECLAW_BACKEND_URL": "http://localhost:3000/api/v1/ai",
+    "LUMIECLAW_USER_TOKEN": "dev-token"
+  },
+  "models": {
+    "default": "lumieclaw/gpt-4o",
+    "providers": {
+      "lumieclaw": {
+        "type": "openai-completions",
+        "baseUrl": "$LUMIECLAW_BACKEND_URL",
+        "headers": {
+          "Authorization": "Bearer $LUMIECLAW_USER_TOKEN"
+        },
+        "models": [
+          "gpt-4o",
+          "gpt-4o-mini",
+          "gpt-4.1",
+          "gpt-4.1-mini",
+          "claude-sonnet-4-20250514",
+          "claude-haiku-4-5-20251001",
+          "deepseek-chat",
+          "deepseek-reasoner"
+        ]
+      }
+    }
+  },
+  "gateway": {
+    "auth": {
+      "mode": "token"
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        },
+        "responses": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "lumieclaw/gpt-4o"
+      },
+      "tools": {
+        "allow": [
+          "browser",
+          "web_search",
+          "web_fetch",
+          "exec",
+          "read",
+          "write"
+        ]
+      }
+    }
+  }
+}
