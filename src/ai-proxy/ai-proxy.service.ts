@@ -2,6 +2,8 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AllConfigType } from '../config/config.type';
 import { ChatCompletionDto } from './dto/chat-completion.dto';
+import { UsageService, RecordUsageData } from '../usage/usage.service';
+import { Response } from 'express';
 
 @Injectable()
 export class AiProxyService {
@@ -9,7 +11,10 @@ export class AiProxyService {
   private readonly apiKey: string;
   private readonly timeout: number;
 
-  constructor(private configService: ConfigService<AllConfigType>) {
+  constructor(
+    private configService: ConfigService<AllConfigType>,
+    private usageService: UsageService,
+  ) {
     this.baseUrl = this.configService.getOrThrow('aiProxy.baseUrl', {
       infer: true,
     });
@@ -43,7 +48,6 @@ export class AiProxyService {
       const data = await response.json();
       const duration = Date.now() - startTime;
 
-      // Record usage (will implement later)
       if (userId && data.usage) {
         this.recordUsage({
           userId,
@@ -64,6 +68,111 @@ export class AiProxyService {
         throw new HttpException('Request timeout', HttpStatus.REQUEST_TIMEOUT);
       }
       throw error;
+    }
+  }
+
+  /**
+   * Streaming chat completion — pipes SSE from upstream (Shenma) to client.
+   */
+  async chatCompletionStream(
+    dto: ChatCompletionDto,
+    res: Response,
+    userId?: number,
+  ) {
+    const startTime = Date.now();
+
+    try {
+      const upstream = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ ...dto, stream: true }),
+        signal: AbortSignal.timeout(this.timeout),
+      });
+
+      if (!upstream.ok) {
+        const error = await upstream.json().catch(() => ({}));
+        res
+          .status(upstream.status)
+          .json(error || { error: 'AI service error' });
+        return;
+      }
+
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      const body = upstream.body;
+      if (!body) {
+        res.end();
+        return;
+      }
+
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+      let totalPromptTokens = 0;
+      let totalCompletionTokens = 0;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          res.write(chunk);
+
+          // Try to extract usage from final chunk
+          const lines = chunk.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+              try {
+                const parsed = JSON.parse(line.slice(6));
+                if (parsed.usage) {
+                  totalPromptTokens = parsed.usage.prompt_tokens || 0;
+                  totalCompletionTokens =
+                    parsed.usage.completion_tokens || 0;
+                }
+              } catch {
+                // Not valid JSON, skip
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      res.end();
+
+      // Record usage after stream completes
+      if (userId && (totalPromptTokens || totalCompletionTokens)) {
+        this.recordUsage({
+          userId,
+          model: dto.model,
+          endpoint: 'chat/completions',
+          promptTokens: totalPromptTokens,
+          completionTokens: totalCompletionTokens,
+          totalTokens: totalPromptTokens + totalCompletionTokens,
+          requestId: 'stream-' + Date.now(),
+          status: 'success',
+          durationMs: Date.now() - startTime,
+        });
+      }
+    } catch (error: any) {
+      if (!res.headersSent) {
+        if (error.name === 'TimeoutError') {
+          res.status(408).json({ error: 'Request timeout' });
+        } else {
+          res.status(502).json({ error: 'AI service unavailable' });
+        }
+      } else {
+        res.end();
+      }
     }
   }
 
@@ -89,8 +198,10 @@ export class AiProxyService {
     }
   }
 
-  private recordUsage(data: any) {
-    // TODO: Implement database recording
-    console.log('Usage recorded:', data);
+  private recordUsage(data: RecordUsageData) {
+    // Fire-and-forget — don't block the response
+    this.usageService.record(data).catch((err) => {
+      console.error('Failed to record usage:', err);
+    });
   }
 }

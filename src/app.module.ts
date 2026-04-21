@@ -26,6 +26,8 @@ import { AllConfigType } from './config/config.type';
 import { SessionModule } from './session/session.module';
 import { MailerModule } from './mailer/mailer.module';
 import { AiProxyModule } from './ai-proxy/ai-proxy.module';
+import { UsageModule } from './usage/usage.module';
+import { ConversationsModule } from './conversations/conversations.module';
 
 @Module({
   imports: [
@@ -84,6 +86,8 @@ import { AiProxyModule } from './ai-proxy/ai-proxy.module';
     MailerModule,
     HomeModule,
     AiProxyModule,
+    UsageModule,
+    ConversationsModule,
   ],
 })
 export class AppModule {}

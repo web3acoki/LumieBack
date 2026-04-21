@@ -5,8 +5,10 @@ import {
   Body,
   UseGuards,
   Request,
+  Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AiProxyService } from './ai-proxy.service';
 import { ChatCompletionDto } from './dto/chat-completion.dto';
 import { RateLimitGuard } from './guards/rate-limit.guard';
@@ -18,9 +20,20 @@ export class AiProxyController {
   constructor(private readonly aiProxyService: AiProxyService) {}
 
   @Post('chat/completions')
-  @ApiOperation({ summary: 'Chat completion (non-streaming)' })
-  async chatCompletion(@Body() dto: ChatCompletionDto, @Request() req) {
+  @ApiOperation({ summary: 'Chat completion (streaming & non-streaming)' })
+  async chatCompletion(
+    @Body() dto: ChatCompletionDto,
+    @Request() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const userId = req.user?.id;
+
+    if (dto.stream) {
+      // SSE streaming — we manually control the response
+      await this.aiProxyService.chatCompletionStream(dto, res, userId);
+      return;
+    }
+
     return this.aiProxyService.chatCompletion(dto, userId);
   }
 
