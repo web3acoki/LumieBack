@@ -134,8 +134,7 @@ export class AiProxyService {
                 const parsed = JSON.parse(line.slice(6));
                 if (parsed.usage) {
                   totalPromptTokens = parsed.usage.prompt_tokens || 0;
-                  totalCompletionTokens =
-                    parsed.usage.completion_tokens || 0;
+                  totalCompletionTokens = parsed.usage.completion_tokens || 0;
                 }
               } catch {
                 // Not valid JSON, skip

@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddUsageConversationMessage1745200000000
-  implements MigrationInterface
-{
+export class AddUsageConversationMessage1745200000000 implements MigrationInterface {
   name = 'AddUsageConversationMessage1745200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
