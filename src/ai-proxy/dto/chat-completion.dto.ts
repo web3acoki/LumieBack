@@ -5,19 +5,40 @@ import {
   IsBoolean,
   IsNumber,
   IsArray,
-  ValidateNested,
   IsObject,
+  Allow,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
+/**
+ * Message DTO — intentionally permissive to support OpenAI-compatible formats.
+ * OpenClaw agent sends messages with content as string OR array (multi-modal),
+ * plus fields like tool_calls, tool_call_id, name, etc.
+ * We validate minimally and pass through to the upstream provider as-is.
+ */
 class MessageDto {
   @ApiProperty({ example: 'user' })
   @IsString()
   role: string;
 
-  @ApiProperty({ example: 'Hello!' })
+  @ApiPropertyOptional({ example: 'Hello!' })
+  @IsOptional()
+  @Allow()
+  content?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Allow()
+  tool_calls?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  content: string;
+  tool_call_id?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
 }
 
 export class ChatCompletionDto {
@@ -27,9 +48,7 @@ export class ChatCompletionDto {
 
   @ApiProperty({ type: [MessageDto] })
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => MessageDto)
-  messages: MessageDto[];
+  messages: any[];
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
@@ -55,4 +74,45 @@ export class ChatCompletionDto {
   @IsOptional()
   @IsArray()
   tools?: any[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Allow()
+  tool_choice?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  parallel_tool_calls?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  top_p?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  frequency_penalty?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  presence_penalty?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Allow()
+  stop?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  seed?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  n?: number;
 }
+
