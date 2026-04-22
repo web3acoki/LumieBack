@@ -115,4 +115,3 @@ export class ChatCompletionDto {
   @IsNumber()
   n?: number;
 }
-
