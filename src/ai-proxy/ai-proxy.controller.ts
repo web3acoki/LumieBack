@@ -6,6 +6,7 @@ import {
   UseGuards,
   Request,
   Res,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -25,16 +26,24 @@ export class AiProxyController {
     @Body() dto: ChatCompletionDto,
     @Request() req,
     @Res({ passthrough: true }) res: Response,
+    @Headers('x-agent-id') agentId?: string,
+    @Headers('x-agent-name') agentName?: string,
   ) {
     const userId = req.user?.id;
 
     if (dto.stream) {
       // SSE streaming — we manually control the response
-      await this.aiProxyService.chatCompletionStream(dto, res, userId);
+      await this.aiProxyService.chatCompletionStream(
+        dto,
+        res,
+        userId,
+        agentId,
+        agentName,
+      );
       return;
     }
 
-    return this.aiProxyService.chatCompletion(dto, userId);
+    return this.aiProxyService.chatCompletion(dto, userId, agentId, agentName);
   }
 
   @Get('models')

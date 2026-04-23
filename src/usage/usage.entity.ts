@@ -42,6 +42,13 @@ export class UsageEntity extends EntityRelationalHelper {
   @Column({ type: String, nullable: true })
   requestId: string | null;
 
+  @Column({ type: String, nullable: true })
+  @Index()
+  agentId: string | null;
+
+  @Column({ type: String, nullable: true })
+  agentName: string | null;
+
   @Column({ type: String, default: 'success' })
   status: string;
 

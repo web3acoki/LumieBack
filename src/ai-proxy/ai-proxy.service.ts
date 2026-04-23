@@ -26,7 +26,12 @@ export class AiProxyService {
     });
   }
 
-  async chatCompletion(dto: ChatCompletionDto, userId?: number) {
+  async chatCompletion(
+    dto: ChatCompletionDto,
+    userId?: number,
+    agentId?: string,
+    agentName?: string,
+  ) {
     const startTime = Date.now();
 
     try {
@@ -59,6 +64,8 @@ export class AiProxyService {
           requestId: data.id,
           status: 'success',
           durationMs: duration,
+          agentId,
+          agentName,
         });
       }
 
@@ -78,6 +85,8 @@ export class AiProxyService {
     dto: ChatCompletionDto,
     res: Response,
     userId?: number,
+    agentId?: string,
+    agentName?: string,
   ) {
     const startTime = Date.now();
 
@@ -160,6 +169,8 @@ export class AiProxyService {
           requestId: 'stream-' + Date.now(),
           status: 'success',
           durationMs: Date.now() - startTime,
+          agentId,
+          agentName,
         });
       }
     } catch (error: any) {

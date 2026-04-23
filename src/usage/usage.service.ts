@@ -13,6 +13,8 @@ export interface RecordUsageData {
   requestId?: string;
   status: string;
   durationMs: number;
+  agentId?: string;
+  agentName?: string;
 }
 
 @Injectable()
@@ -33,6 +35,8 @@ export class UsageService {
         totalTokens: data.totalTokens,
         cost: 0, // TODO: calculate based on model pricing
         requestId: data.requestId ?? null,
+        agentId: data.agentId ?? null,
+        agentName: data.agentName ?? null,
         status: data.status,
         durationMs: data.durationMs,
       }),
@@ -64,5 +68,35 @@ export class UsageService {
       totalRequests: parseInt(result.totalRequests, 10),
       totalCost: parseFloat(result.totalCost),
     };
+  }
+
+  async getUsageByAgent(
+    userId: number,
+    since?: Date,
+  ): Promise<
+    Array<{
+      agentId: string;
+      agentName: string;
+      totalTokens: number;
+      totalRequests: number;
+      totalCost: number;
+    }>
+  > {
+    const qb = this.usageRepository
+      .createQueryBuilder('u')
+      .select('u.agentId', 'agentId')
+      .addSelect('MAX(u.agentName)', 'agentName')
+      .addSelect('COALESCE(SUM(u.totalTokens), 0)', 'totalTokens')
+      .addSelect('COUNT(u.id)', 'totalRequests')
+      .addSelect('COALESCE(SUM(u.cost), 0)', 'totalCost')
+      .where('u.userId = :userId', { userId })
+      .andWhere('u.agentId IS NOT NULL')
+      .groupBy('u.agentId');
+
+    if (since) {
+      qb.andWhere('u.createdAt >= :since', { since });
+    }
+
+    return qb.getRawMany();
   }
 }
