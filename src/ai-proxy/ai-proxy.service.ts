@@ -1,7 +1,6 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AllConfigType } from '../config/config.type';
-import { ChatCompletionDto } from './dto/chat-completion.dto';
 import { UsageService, RecordUsageData } from '../usage/usage.service';
 import { Response } from 'express';
 
@@ -27,7 +26,7 @@ export class AiProxyService {
   }
 
   async chatCompletion(
-    dto: ChatCompletionDto,
+    dto: any,
     userId?: number,
     agentId?: string,
     agentName?: string,
@@ -82,7 +81,7 @@ export class AiProxyService {
    * Streaming chat completion — pipes SSE from upstream (Shenma) to client.
    */
   async chatCompletionStream(
-    dto: ChatCompletionDto,
+    dto: any,
     res: Response,
     userId?: number,
     agentId?: string,

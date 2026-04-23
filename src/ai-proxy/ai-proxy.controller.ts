@@ -7,11 +7,11 @@ import {
   Request,
   Res,
   Headers,
+  UsePipes,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AiProxyService } from './ai-proxy.service';
-import { ChatCompletionDto } from './dto/chat-completion.dto';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 
 @ApiTags('AI Proxy')
@@ -20,10 +20,20 @@ import { RateLimitGuard } from './guards/rate-limit.guard';
 export class AiProxyController {
   constructor(private readonly aiProxyService: AiProxyService) {}
 
+  /**
+   * Chat completion endpoint — passthrough to upstream AI provider.
+   *
+   * IMPORTANT: We use @UsePipes() with empty args to DISABLE the global
+   * ValidationPipe for this endpoint. The global pipe has whitelist:true
+   * which strips unknown fields (tools, tool_choice, metadata, etc.)
+   * that OpenClaw agent sends. We need to forward the ENTIRE request
+   * body to the upstream provider as-is.
+   */
   @Post('chat/completions')
   @ApiOperation({ summary: 'Chat completion (streaming & non-streaming)' })
+  @UsePipes()
   async chatCompletion(
-    @Body() dto: ChatCompletionDto,
+    @Body() body: any,
     @Request() req,
     @Res({ passthrough: true }) res: Response,
     @Headers('x-agent-id') agentId?: string,
@@ -31,10 +41,9 @@ export class AiProxyController {
   ) {
     const userId = req.user?.id;
 
-    if (dto.stream) {
-      // SSE streaming — we manually control the response
+    if (body.stream) {
       await this.aiProxyService.chatCompletionStream(
-        dto,
+        body,
         res,
         userId,
         agentId,
@@ -43,7 +52,7 @@ export class AiProxyController {
       return;
     }
 
-    return this.aiProxyService.chatCompletion(dto, userId, agentId, agentName);
+    return this.aiProxyService.chatCompletion(body, userId, agentId, agentName);
   }
 
   @Get('models')
